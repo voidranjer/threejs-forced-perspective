@@ -8,10 +8,12 @@ const SPEED = 0.5;
 
 // state variables
 const objects = [];
+let isMouseDown = false;
 let moveForward = false;
 let moveBackward = false;
 let strafeRight = false;
 let strafeLeft = false;
+let initialDist = null;
 
 const renderer = new THREE.WebGLRenderer();
 const camera = new THREE.PerspectiveCamera(
@@ -21,6 +23,7 @@ const camera = new THREE.PerspectiveCamera(
   500
 );
 const scene = new THREE.Scene();
+
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
 const arrowHelper = new THREE.ArrowHelper(
@@ -37,6 +40,11 @@ const plane = new THREE.Mesh(
     side: THREE.DoubleSide,
   })
 );
+const mesh = new THREE.Mesh(
+  new THREE.SphereGeometry(3),
+  new THREE.MeshBasicMaterial({ color: 0xff0000 })
+);
+
 // const dragControls = new DragControls(objects, camera, renderer.domElement);
 const pointerLockControls = new PointerLockControls(camera, document.body);
 
@@ -65,7 +73,6 @@ function onKeyDown(e) {
       break;
   }
 }
-
 function onKeyUp(e) {
   switch (e.key) {
     case "w":
@@ -82,7 +89,6 @@ function onKeyUp(e) {
       break;
   }
 }
-
 function onPointerMove(e) {
   // calculate pointer position in normalized device coordinates
   // (-1 to +1) for both components
@@ -92,11 +98,6 @@ function onPointerMove(e) {
 }
 
 function setup() {
-  const mesh = new THREE.Mesh(
-    new THREE.SphereGeometry(),
-    new THREE.MeshBasicMaterial({ color: 0xff0000 })
-  );
-
   renderer.setSize(window.innerWidth, window.innerHeight);
   document.body.appendChild(renderer.domElement);
 
@@ -104,6 +105,7 @@ function setup() {
   camera.lookAt(0, 0, 0);
 
   plane.position.set(0, 0, -20);
+  objects.push(plane);
   scene.add(plane);
 
   objects.push(mesh);
@@ -126,6 +128,11 @@ function setup() {
     pointerLockControls.lock();
   });
   document.addEventListener("pointermove", onPointerMove);
+  document.addEventListener("mousedown", () => (isMouseDown = true));
+  document.addEventListener("mouseup", () => {
+    isMouseDown = false;
+    initialDist = null;
+  });
 
   // debug
   // scene.add(arrowHelper);
@@ -166,10 +173,24 @@ function animate() {
   arrowHelper.setDirection(direction);
 
   const intersects = raycaster.intersectObjects(objects);
-  objects.forEach((obj) => obj.material.color.set(0xff0000));
-  if (intersects.length > 0) {
-    const firstIntersected = intersects[0].object;
-    firstIntersected.material.color.set(0x00ff00);
+  // objects.forEach((obj) => obj.material.color.set(0xff0000));
+  mesh.material.color.set(0xff0000);
+  if (intersects.length === 2) {
+    // const firstIntersected = intersects[0].object;
+    mesh.material.color.set(0x00ff00);
+  }
+
+  // Forced Perspective
+  const dist = camera.position.distanceTo(mesh.position);
+  if (intersects.length === 2 && isMouseDown) {
+    if (initialDist === null) {
+      initialDist = dist;
+      return;
+    }
+
+    const scale = intersects[intersects.length - 1].distance / initialDist;
+    mesh.scale.set(scale, scale, scale);
+    mesh.position.copy(intersects[intersects.length - 1].point);
   }
 }
 
