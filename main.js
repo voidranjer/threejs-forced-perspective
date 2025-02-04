@@ -15,7 +15,7 @@ let moveBackward = false;
 let strafeRight = false;
 let strafeLeft = false;
 let prevMouseState = "mouseup"; // mouseup, mousedown
-let initialDistToObj = null;
+let prevDistToObj = null;
 let prevIntersectPoint = null;
 
 const renderer = new THREE.WebGLRenderer();
@@ -62,7 +62,7 @@ const pointerLockControls = new PointerLockControls(camera, document.body);
 
 function onMouseUp(e) {
   isMouseDown = false;
-  initialDistToObj = null;
+  prevDistToObj = null;
   prevIntersectPoint = null;
 }
 function onMouseDown(e) {
@@ -180,8 +180,7 @@ function animate() {
   // arrowHelper.position.copy(camera.position);
   // arrowHelper.setDirection(direction);
 
-  // TODO: this is computed twice (dupe)
-  const intersects = raycaster.intersectObjects(objects);
+  let intersects = raycaster.intersectObjects(objects);
   // objects.forEach((obj) => obj.material.color.set(0xff0000));
   // mesh.material.color.set(0xff0000);
   // if (intersects.length === 2) {
@@ -192,15 +191,23 @@ function animate() {
   // Forced Perspective
   let distToObj = camera.position.distanceTo(mesh.position);
   if (intersects.length === 2 && isMouseDown) {
-    if (initialDistToObj === null) {
+    if (prevDistToObj === null) {
       /*
-        - setting initialDistToObj fixes the apparent scale of the object to look like its
-          actual scale when initialDistToObj == distToObj
+        - setting prevDistToObj fixes the apparent scale of the object to look like its
+          actual scale when prevDistToObj == distToObj
         - to set an anchor point (for the apparent scale of the obj), capture the value of
-          distToObj at that moment into initialDistToObj
+          distToObj at that moment into prevDistToObj
       */
-      initialDistToObj = distToObj;
+      // prevDistToObj = distToObj;
     }
+
+    if (prevIntersectPoint !== null) {
+      const offset = intersects[1].point.clone().sub(prevIntersectPoint);
+      offset.z = 0; // move only in x and y TODO: This may not work if we use it on another plane (not xy)
+      mesh.position.add(offset);
+      raycaster.intersectObjects(objects); // recompute intersects after moving
+    }
+    prevIntersectPoint = intersects[1].point.clone();
 
     if (prevMouseState === "mouseup") {
     }
@@ -208,38 +215,42 @@ function animate() {
     // compute bounding boxes
     mesh.geometry.computeBoundingBox();
     plane.geometry.computeBoundingBox();
-    const meshBox = mesh.geometry.boundingBox
+    let meshBox = mesh.geometry.boundingBox
       .clone()
       .applyMatrix4(mesh.matrixWorld);
-    const planeBox = plane.geometry.boundingBox
+    let planeBox = plane.geometry.boundingBox
       .clone()
       .applyMatrix4(plane.matrixWorld);
+    // let meshBoxLength = meshBox.getSize(new THREE.Vector3()).length();
+    // compute intersection
+    // let boxIntersection = meshBox.clone().intersect(planeBox);
+    // let boxIntersectionLength = boxIntersection
+    //   .getSize(new THREE.Vector3())
+    //   .length();
 
     // push object away from the camera until it reaches the plane
     if (!meshBox.intersectsBox(planeBox)) {
-      const CLIPPING_THRESH = 0.1; // percentage
-      mesh.position.addScaledVector(cameraDirection, RADIUS * CLIPPING_THRESH);
+      mesh.position.addScaledVector(cameraDirection, 1);
     }
-    distToObj = camera.position.distanceTo(mesh.position); // recompute after moving
-
-    const scale = distToObj / initialDistToObj;
-    mesh.scale.set(scale, scale, scale);
-
-    // if (prevIntersectPoint !== null) {
-    //   const offset = intersects[1].point
-    //     .clone()
-    //     .sub(prevIntersectPoint);
-    //   mesh.position.add(offset);
+    // if (boxIntersectionLength === Number(0)) {
+    //   const distObjToPlane = intersects[0].point.distanceTo(
+    //     intersects[1].point
+    //   );
+    //   mesh.position.addScaledVector(cameraDirection, distObjToPlane - 2);
     // }
-    // prevIntersectPoint = intersects[0].point.clone();
 
-    // if (initialDist === null || prevIntersectPoint === null) {
-    //   initialDist = dist;
-    // prevIntersectPoint = intersects[0].point;
-    //   return;
-    // }
+    // recompute after moving
+    distToObj = camera.position.distanceTo(mesh.position);
+
+    // scale
+    if (prevDistToObj !== null) {
+      const scale = distToObj / prevDistToObj;
+      const scalingMatrix = new THREE.Matrix4().makeScale(scale, scale, scale);
+      mesh.applyMatrix4(scalingMatrix);
+    }
+    prevDistToObj = distToObj;
   }
-  prevMouseState = isMouseDown ? "mousedown" : "mouseup";
+  prevMouseState = "mouseup";
 }
 
 setup();
