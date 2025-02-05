@@ -1,6 +1,5 @@
 import * as THREE from "three";
-// import WebGL from "three/addons/capabilities/WebGL.js";
-// import { DragControls } from "three/addons/controls/DragControls.js";
+import { GUI } from "dat.gui";
 import { PointerLockControls } from "three/addons/controls/PointerLockControls.js";
 
 // constants
@@ -29,12 +28,6 @@ const scene = new THREE.Scene();
 
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
-const arrowHelper = new THREE.ArrowHelper(
-  raycaster.ray.cameraDirection,
-  raycaster.ray.origin,
-  300,
-  0x0000ff
-);
 
 const plane = new THREE.Mesh(
   new THREE.PlaneGeometry(50, 50),
@@ -48,17 +41,20 @@ const mesh = new THREE.Mesh(
   new THREE.MeshBasicMaterial({ color: 0xff0000 })
 );
 
-// const dragControls = new DragControls(objects, camera, renderer.domElement);
+// helpers
+const virtualMesh = new THREE.Mesh(
+  new THREE.SphereGeometry(RADIUS),
+  new THREE.MeshBasicMaterial({ color: 0x00ff00, visible: false })
+);
+const scalePivot = new THREE.Object3D();
+
+const gui = new GUI();
+const customDebugger = { message: "empty" };
+const debugFolder = gui.addFolder("Debug");
+debugFolder.add(customDebugger, "message").listen();
+debugFolder.open();
+
 const pointerLockControls = new PointerLockControls(camera, document.body);
-
-// const box = new THREE.Box3();
-
-// ensure the bounding box is computed for its geometry
-// this should be done only once (assuming static geometries)
-// mesh.geometry.computeBoundingBox();
-
-// in the animation loop, compute the current bounding box with the world matrix
-// box.copy(mesh.geometry.boundingBox).applyMatrix4(mesh.matrixWorld);
 
 function onMouseUp(e) {
   isMouseDown = false;
@@ -121,6 +117,8 @@ function setup() {
 
   objects.push(mesh);
   scene.add(mesh);
+  scene.add(virtualMesh);
+  scene.add(scalePivot);
 
   // add crosshair to center using pos absolute
   const crosshair = document.createElement("div");
@@ -141,9 +139,6 @@ function setup() {
   document.addEventListener("pointermove", onPointerMove);
   document.addEventListener("mousedown", onMouseDown);
   document.addEventListener("mouseup", onMouseUp);
-
-  // debug
-  // scene.add(arrowHelper);
 }
 
 function animate() {
@@ -177,8 +172,6 @@ function animate() {
   // Raycasting
   raycaster.setFromCamera(pointer, camera); // pos
   raycaster.ray.direction.copy(cameraDirection); // orientation
-  // arrowHelper.position.copy(camera.position);
-  // arrowHelper.setDirection(direction);
 
   let intersects = raycaster.intersectObjects(objects);
   // objects.forEach((obj) => obj.material.color.set(0xff0000));
@@ -190,20 +183,23 @@ function animate() {
 
   // Forced Perspective
   let distToObj = camera.position.distanceTo(mesh.position);
+  customDebugger.message = `${cameraDirection.x.toFixed(
+    2
+  )}, ${cameraDirection.y.toFixed(2)}, ${cameraDirection.z.toFixed(2)}`;
   if (intersects.length === 2 && isMouseDown) {
-    if (prevDistToObj === null) {
-      /*
+    // if (prevDistToObj === null) {
+    /*
         - setting prevDistToObj fixes the apparent scale of the object to look like its
           actual scale when prevDistToObj == distToObj
         - to set an anchor point (for the apparent scale of the obj), capture the value of
           distToObj at that moment into prevDistToObj
       */
-      // prevDistToObj = distToObj;
-    }
+    // prevDistToObj = distToObj;
+    // }
 
     if (prevIntersectPoint !== null) {
       const offset = intersects[1].point.clone().sub(prevIntersectPoint);
-      offset.z = 0; // move only in x and y TODO: This may not work if we use it on another plane (not xy)
+      // offset.z = 0; // move only in x and y TODO: This may not work if we use it on another plane (not xy)
       mesh.position.add(offset);
       raycaster.intersectObjects(objects); // recompute intersects after moving
     }
@@ -229,24 +225,39 @@ function animate() {
     //   .length();
 
     // push object away from the camera until it reaches the plane
-    if (!meshBox.intersectsBox(planeBox)) {
+    if (meshBox.intersectsBox(planeBox)) {
+      // use virtualMesh to simulate pushing the box
+      // if pul the box will cause it to leave the plane, do not do it
+      // otherwise, pull it actually
+
+      virtualMesh.position.copy(mesh.position);
+      virtualMesh.position.addScaledVector(cameraDirection, -1); // TODO: this shouldn't be just "-1" it seems to be dependent on the size of the object
+      virtualMesh.geometry.computeBoundingBox();
+      let virtualMeshBox = virtualMesh.geometry.boundingBox
+        .clone()
+        .applyMatrix4(virtualMesh.matrixWorld);
+
+      if (virtualMeshBox.intersectsBox(planeBox)) {
+        mesh.position.addScaledVector(cameraDirection, -1);
+      }
+    } else {
       mesh.position.addScaledVector(cameraDirection, 1);
     }
-    // if (boxIntersectionLength === Number(0)) {
-    //   const distObjToPlane = intersects[0].point.distanceTo(
-    //     intersects[1].point
-    //   );
-    //   mesh.position.addScaledVector(cameraDirection, distObjToPlane - 2);
-    // }
 
     // recompute after moving
     distToObj = camera.position.distanceTo(mesh.position);
 
     // scale
     if (prevDistToObj !== null) {
+      // scalePivot.position.copy(intersects[0].point);
+
       const scale = distToObj / prevDistToObj;
-      const scalingMatrix = new THREE.Matrix4().makeScale(scale, scale, scale);
+      const scalingMatrix = new THREE.Matrix4().makeScale(scale, scale, scale); // TODO: Scale not from 0,0,0 but from pointer
       mesh.applyMatrix4(scalingMatrix);
+      // const saveParent = mesh.parent;
+      // scalePivot.attach(mesh);
+      // scalePivot.applyMatrix4(scalingMatrix);
+      // mesh.parent = saveParent;
     }
     prevDistToObj = distToObj;
   }
@@ -255,8 +266,3 @@ function animate() {
 
 setup();
 renderer.setAnimationLoop(animate);
-
-// if (!WebGL.isWebGL2Available()) {
-//   const warning = WebGL.getWebGL2ErrorMessage();
-//   document.getElementById("container").appendChild(warning);
-// }
