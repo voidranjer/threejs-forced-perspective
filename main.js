@@ -214,15 +214,21 @@ function animate() {
     // prevIntersectPoint = intersects[1].point.clone();
 
     if (prevMouseState === "mouseup") {
-      console.log("i ran");
-      // reattach mesh to translatePivot
+      /**
+       * reattach mesh to translatePivot
+       * - without this, the position of translatePivot's world origin relative to the mesh will remain the same
+       *   as it was from the first time the mesh was attached to the translatePivot
+       * - the side effect looks like this: mesh will snap to center of the cursor every time you try to drag it
+       *   even if you started grabbing onto the mesh from a different point/ at a different angle
+       */
       scene.attach(mesh);
       scene.attach(virtualMesh);
       translatePivot.position.copy(intersects[1].point);
       translatePivot.attach(mesh);
       translatePivot.attach(virtualMesh);
+    } else {
+      translatePivot.position.copy(intersects[1].point);
     }
-    translatePivot.position.copy(intersects[1].point);
     raycaster.intersectObjects(objects); // recompute intersects after moving
 
     // compute bounding boxes
