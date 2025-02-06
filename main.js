@@ -46,12 +46,13 @@ const virtualMesh = new THREE.Mesh(
   new THREE.SphereGeometry(RADIUS),
   new THREE.MeshBasicMaterial({ color: 0x00ff00, visible: false })
 );
-const scalePivot = new THREE.Object3D();
+const translatePivot = new THREE.Object3D();
 
 const gui = new GUI();
-const customDebugger = { message: "empty" };
+const customDebugger = { message: "empty", message2: "empty" };
 const debugFolder = gui.addFolder("Debug");
 debugFolder.add(customDebugger, "message").listen();
+debugFolder.add(customDebugger, "message2").listen();
 debugFolder.open();
 
 const pointerLockControls = new PointerLockControls(camera, document.body);
@@ -116,9 +117,11 @@ function setup() {
   scene.add(plane);
 
   objects.push(mesh);
-  scene.add(mesh);
-  scene.add(virtualMesh);
-  scene.add(scalePivot);
+  // scene.add(mesh);
+  // scene.add(virtualMesh);
+  scene.add(translatePivot);
+  translatePivot.add(mesh);
+  translatePivot.add(virtualMesh);
 
   // add crosshair to center using pos absolute
   const crosshair = document.createElement("div");
@@ -183,9 +186,14 @@ function animate() {
 
   // Forced Perspective
   let distToObj = camera.position.distanceTo(mesh.position);
-  customDebugger.message = `${cameraDirection.x.toFixed(
-    2
-  )}, ${cameraDirection.y.toFixed(2)}, ${cameraDirection.z.toFixed(2)}`;
+  // customDebugger.message = `${cameraDirection.x.toFixed(
+  //   2
+  // )}, ${cameraDirection.y.toFixed(2)}, ${cameraDirection.z.toFixed(2)}`;
+  customDebugger.message = mesh
+    .getWorldPosition(new THREE.Vector3())
+    .toArray()
+    .map((item) => item.toFixed(2))
+    .toString();
   if (intersects.length === 2 && isMouseDown) {
     // if (prevDistToObj === null) {
     /*
@@ -197,16 +205,25 @@ function animate() {
     // prevDistToObj = distToObj;
     // }
 
-    if (prevIntersectPoint !== null) {
-      const offset = intersects[1].point.clone().sub(prevIntersectPoint);
-      // offset.z = 0; // move only in x and y TODO: This may not work if we use it on another plane (not xy)
-      mesh.position.add(offset);
-      raycaster.intersectObjects(objects); // recompute intersects after moving
-    }
-    prevIntersectPoint = intersects[1].point.clone();
+    // if (prevIntersectPoint !== null) {
+    //   // const offset = intersects[1].point.clone().sub(prevIntersectPoint);
+    //   // offset.z = 0; // move only in x and y TODO: This may not work if we use it on another plane (not xy)
+    //   // mesh.position.add(offset);
+
+    // }
+    // prevIntersectPoint = intersects[1].point.clone();
 
     if (prevMouseState === "mouseup") {
+      console.log("i ran");
+      // reattach mesh to translatePivot
+      scene.attach(mesh);
+      scene.attach(virtualMesh);
+      translatePivot.position.copy(intersects[1].point);
+      translatePivot.attach(mesh);
+      translatePivot.attach(virtualMesh);
     }
+    translatePivot.position.copy(intersects[1].point);
+    raycaster.intersectObjects(objects); // recompute intersects after moving
 
     // compute bounding boxes
     mesh.geometry.computeBoundingBox();
@@ -227,11 +244,11 @@ function animate() {
     // push object away from the camera until it reaches the plane
     if (meshBox.intersectsBox(planeBox)) {
       // use virtualMesh to simulate pushing the box
-      // if pul the box will cause it to leave the plane, do not do it
+      // if pulling the box will cause it to leave the plane, do not do it
       // otherwise, pull it actually
 
       virtualMesh.position.copy(mesh.position);
-      virtualMesh.position.addScaledVector(cameraDirection, -1); // TODO: this shouldn't be just "-1" it seems to be dependent on the size of the object
+      virtualMesh.position.addScaledVector(cameraDirection, -1);
       virtualMesh.geometry.computeBoundingBox();
       let virtualMeshBox = virtualMesh.geometry.boundingBox
         .clone()
@@ -245,23 +262,23 @@ function animate() {
     }
 
     // recompute after moving
-    distToObj = camera.position.distanceTo(mesh.position);
+    distToObj = camera
+      .getWorldPosition(new THREE.Vector3())
+      .distanceTo(mesh.getWorldPosition(new THREE.Vector3()));
 
     // scale
     if (prevDistToObj !== null) {
-      // scalePivot.position.copy(intersects[0].point);
-
       const scale = distToObj / prevDistToObj;
+      customDebugger.message2 = scale;
       const scalingMatrix = new THREE.Matrix4().makeScale(scale, scale, scale); // TODO: Scale not from 0,0,0 but from pointer
       mesh.applyMatrix4(scalingMatrix);
-      // const saveParent = mesh.parent;
-      // scalePivot.attach(mesh);
-      // scalePivot.applyMatrix4(scalingMatrix);
-      // mesh.parent = saveParent;
     }
     prevDistToObj = distToObj;
+
+    prevMouseState = "mousedown";
+  } else {
+    prevMouseState = "mouseup";
   }
-  prevMouseState = "mouseup";
 }
 
 setup();
