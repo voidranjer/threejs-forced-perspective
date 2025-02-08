@@ -1,5 +1,6 @@
 let prevMouseIsPressed = false;
 let indicatorObj = null;
+let offsetCaptured = false;
 
 function setup() {
   createCanvas(600, 600);
@@ -8,14 +9,13 @@ function setup() {
 }
 
 function draw() {
-  // rect(0, 0, mouseX, mouseY);
-
   if (mouseIsPressed) {
-    if (!prevMouseIsPressed) {
+    if (!prevMouseIsPressed && !offsetCaptured) {
       indicatorObj.captureOffset();
+      // offsetCaptured = true;
     }
   } else {
-    if (prevMouseIsPressed) {
+    if (prevMouseIsPressed && !offsetCaptured) {
       indicatorObj.persistOffset();
     }
   }
