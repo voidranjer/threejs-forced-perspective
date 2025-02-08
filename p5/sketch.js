@@ -20,7 +20,6 @@ function draw() {
     }
   }
 
-  background(220);
   indicatorObj.draw();
 
   prevMouseIsPressed = mouseIsPressed;
@@ -39,10 +38,47 @@ class Point {
 
   draw() {
     if (mouseIsPressed) {
+      background(220);
+
       this.offsetX = mouseX - this.capturedMouseX;
       this.offsetY = mouseY - this.capturedMouseY;
+
+      const circleX = this.x + this.offsetX;
+      const circleY = this.y + this.offsetY;
+
+      circle(circleX, circleY, this.radius);
+
+      push();
+      fill("green");
+      textAlign(CENTER, CENTER);
+      text(
+        `Local: (${circleX - mouseX}, ${circleY - mouseY})`,
+        circleX,
+        circleY + textSize()
+      );
+      text(
+        `World: (${circleX}, ${circleY})`,
+        circleX,
+        circleY + 2 * textSize()
+      );
+      pop();
+
+      push();
+      fill("red");
+      circle(mouseX, mouseY, 10);
+      textAlign(CENTER, CENTER);
+      text("Local: (0, 0)", mouseX, mouseY - textSize());
+      text(`World: (${mouseX}, ${mouseY})`, mouseX, mouseY - 2 * textSize());
+      pop();
+
+      push();
+      stroke("blue");
+      line(circleX, circleY, mouseX, circleY);
+      line(circleX, mouseY, mouseX, mouseY);
+      line(circleX, circleY, circleX, mouseY);
+      line(mouseX, circleY, mouseX, mouseY);
+      pop();
     }
-    circle(this.x + this.offsetX, this.y + this.offsetY, this.radius);
   }
 
   captureOffset() {
