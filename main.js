@@ -15,7 +15,6 @@ let strafeRight = false;
 let strafeLeft = false;
 let prevMouseState = "mouseup"; // mouseup, mousedown
 let prevDistToObj = null;
-let prevIntersectPoint = null;
 
 const renderer = new THREE.WebGLRenderer();
 const camera = new THREE.PerspectiveCamera(
@@ -49,10 +48,9 @@ const virtualMesh = new THREE.Mesh(
 const translatePivot = new THREE.Object3D();
 
 const gui = new GUI();
-const customDebugger = { message: "empty", message2: "empty" };
+const customDebugger = { message: "empty" };
 const debugFolder = gui.addFolder("Debug");
 debugFolder.add(customDebugger, "message").listen();
-debugFolder.add(customDebugger, "message2").listen();
 debugFolder.open();
 
 const pointerLockControls = new PointerLockControls(camera, document.body);
@@ -60,7 +58,6 @@ const pointerLockControls = new PointerLockControls(camera, document.body);
 function onMouseUp(e) {
   isMouseDown = false;
   prevDistToObj = null;
-  prevIntersectPoint = null;
 }
 function onMouseDown(e) {
   isMouseDown = true;
@@ -186,33 +183,12 @@ function animate() {
 
   // Forced Perspective
   let distToObj = camera.position.distanceTo(mesh.position);
-  // customDebugger.message = `${cameraDirection.x.toFixed(
-  //   2
-  // )}, ${cameraDirection.y.toFixed(2)}, ${cameraDirection.z.toFixed(2)}`;
   customDebugger.message = mesh
     .getWorldPosition(new THREE.Vector3())
     .toArray()
     .map((item) => item.toFixed(2))
     .toString();
   if (intersects.length === 2 && isMouseDown) {
-    // if (prevDistToObj === null) {
-    /*
-        - setting prevDistToObj fixes the apparent scale of the object to look like its
-          actual scale when prevDistToObj == distToObj
-        - to set an anchor point (for the apparent scale of the obj), capture the value of
-          distToObj at that moment into prevDistToObj
-      */
-    // prevDistToObj = distToObj;
-    // }
-
-    // if (prevIntersectPoint !== null) {
-    //   // const offset = intersects[1].point.clone().sub(prevIntersectPoint);
-    //   // offset.z = 0; // move only in x and y TODO: This may not work if we use it on another plane (not xy)
-    //   // mesh.position.add(offset);
-
-    // }
-    // prevIntersectPoint = intersects[1].point.clone();
-
     if (prevMouseState === "mouseup") {
       /**
        * reattach mesh to translatePivot
@@ -240,12 +216,6 @@ function animate() {
     let planeBox = plane.geometry.boundingBox
       .clone()
       .applyMatrix4(plane.matrixWorld);
-    // let meshBoxLength = meshBox.getSize(new THREE.Vector3()).length();
-    // compute intersection
-    // let boxIntersection = meshBox.clone().intersect(planeBox);
-    // let boxIntersectionLength = boxIntersection
-    //   .getSize(new THREE.Vector3())
-    //   .length();
 
     // push object away from the camera until it reaches the plane
     if (meshBox.intersectsBox(planeBox)) {
@@ -277,7 +247,11 @@ function animate() {
       const scale = distToObj / prevDistToObj;
       customDebugger.message2 = scale;
       const scalingMatrix = new THREE.Matrix4().makeScale(scale, scale, scale); // TODO: Scale not from 0,0,0 but from pointer
+      // todo: soft eng strategy to wrap mesh and virtualMesh into one obj for parity
+      // use scalePivot to scale from intersect[1].point
+      // posibbly use the same pivot as translatePivot
       mesh.applyMatrix4(scalingMatrix);
+      virtualMesh.applyMatrix4(scalingMatrix);
     }
     prevDistToObj = distToObj;
 
